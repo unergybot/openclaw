@@ -1,0 +1,22 @@
+{
+  "name": "@openclaw/bestbox",
+  "version": "0.1.0",
+  "description": "OpenClaw plugin for BestBox enterprise agent routing",
+  "type": "module",
+  "main": "index.ts",
+  "exports": {
+    ".": "./index.ts"
+  },
+  "keywords": ["openclaw", "bestbox", "enterprise", "erp", "crm"],
+  "author": "OpenClaw",
+  "license": "MIT",
+  "peerDependencies": {
+    "openclaw": "*"
+  },
+  "devDependencies": {
+    "openclaw": "workspace:*"
+  },
+  "dependencies": {
+    "@sinclair/typebox": "^0.32.0"
+  }
+}

@@ -1,0 +1,42 @@
+{
+  "id": "bestbox",
+  "name": "BestBox Enterprise Agent",
+  "description": "Routes enterprise queries (ERP, CRM, IT Ops, OA) to BestBox Agent API. OpenClaw becomes the control plane for multi-channel enterprise agents.",
+  "skills": ["skills"],
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "apiUrl": {
+        "type": "string",
+        "description": "BestBox Agent API base URL (e.g. http://localhost:8000)",
+        "default": "http://localhost:8000"
+      },
+      "timeout": {
+        "type": "number",
+        "description": "Request timeout in milliseconds",
+        "default": 60000
+      },
+      "domains": {
+        "type": "array",
+        "items": { "type": "string" },
+        "description": "Enabled domains: erp, crm, itops, oa",
+        "default": ["erp", "crm", "itops", "oa"]
+      }
+    }
+  },
+  "uiHints": {
+    "apiUrl": {
+      "label": "BestBox API URL",
+      "placeholder": "http://localhost:8000"
+    },
+    "timeout": {
+      "label": "Timeout (ms)",
+      "advanced": true
+    },
+    "domains": {
+      "label": "Enabled Domains",
+      "help": "Which enterprise agent domains to enable"
+    }
+  }
+}
