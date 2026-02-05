@@ -18,52 +18,55 @@ interface ChatMessage {
   content: string;
 }
 
-interface BestBoxResponse {
-  response: string;
-  agent: string;
-  trace?: Array<{ node: string; duration_ms: number }>;
-}
+const BestBoxToolSchema = Type.Object({
+  query: Type.String({
+    description: "The user's enterprise query to route to BestBox agents",
+  }),
+  domain: Type.Optional(
+    Type.String({
+      description:
+        "Force a specific domain: erp, crm, itops, oa. If omitted, BestBox router classifies automatically.",
+    })
+  ),
+  context: Type.Optional(
+    Type.String({
+      description: "Additional context from conversation history",
+    })
+  ),
+});
 
 export function createBestBoxTool(api: OpenClawPluginApi) {
   return {
     name: "bestbox",
     description: `Route enterprise queries to BestBox domain agents. Domains: ERP (invoices, inventory, financials), CRM (leads, opportunities, quotes), IT Ops (tickets, KB search, diagnostics), OA (leave, meetings, documents). Use this tool when the user asks about enterprise systems, business operations, or workplace workflows.`,
-    inputSchema: Type.Object({
-      query: Type.String({
-        description: "The user's enterprise query to route to BestBox agents",
-      }),
-      domain: Type.Optional(
-        Type.String({
-          description:
-            "Force a specific domain: erp, crm, itops, oa. If omitted, BestBox router classifies automatically.",
-        })
-      ),
-      context: Type.Optional(
-        Type.String({
-          description: "Additional context from conversation history",
-        })
-      ),
-    }),
-    async handler(
-      input: { query: string; domain?: string; context?: string },
-      _ctx: unknown
-    ): Promise<string> {
+    parameters: BestBoxToolSchema,
+    async execute(
+      _toolCallId: string,
+      params: { query: string; domain?: string; context?: string }
+    ) {
       const cfg = api.pluginConfig as BestBoxConfig | undefined;
       const apiUrl = cfg?.apiUrl ?? "http://localhost:8000";
       const timeout = cfg?.timeout ?? 60000;
       const enabledDomains = cfg?.domains ?? ["erp", "crm", "itops", "oa"];
 
+      const textResult = (text: string, details?: Record<string, unknown>) => ({
+        content: [{ type: "text" as const, text }],
+        details: details ?? {},
+      });
+
       // Validate domain if specified
-      if (input.domain && !enabledDomains.includes(input.domain)) {
-        return `Domain "${input.domain}" is not enabled. Available: ${enabledDomains.join(", ")}`;
+      if (params.domain && !enabledDomains.includes(params.domain)) {
+        return textResult(
+          `Domain "${params.domain}" is not enabled. Available: ${enabledDomains.join(", ")}`
+        );
       }
 
       // Build messages for BestBox API
       const messages: ChatMessage[] = [];
-      if (input.context) {
-        messages.push({ role: "system", content: input.context });
+      if (params.context) {
+        messages.push({ role: "system", content: params.context });
       }
-      messages.push({ role: "user", content: input.query });
+      messages.push({ role: "user", content: params.query });
 
       try {
         const controller = new AbortController();
@@ -79,7 +82,7 @@ export function createBestBoxTool(api: OpenClawPluginApi) {
             model: "bestbox-enterprise",
             stream: false,
             // Pass domain hint if specified
-            ...(input.domain && { metadata: { force_domain: input.domain } }),
+            ...(params.domain && { metadata: { force_domain: params.domain } }),
           }),
           signal: controller.signal,
         });
@@ -88,7 +91,7 @@ export function createBestBoxTool(api: OpenClawPluginApi) {
 
         if (!response.ok) {
           const errorText = await response.text();
-          return `BestBox API error (${response.status}): ${errorText}`;
+          return textResult(`BestBox API error (${response.status}): ${errorText}`);
         }
 
         const data = (await response.json()) as {
@@ -99,21 +102,25 @@ export function createBestBoxTool(api: OpenClawPluginApi) {
 
         // Handle OpenAI-compatible format
         if (data.choices?.[0]?.message?.content) {
-          return data.choices[0].message.content;
+          return textResult(data.choices[0].message.content, { agent: data.agent });
         }
 
         // Handle BestBox native format
         if (data.response) {
           const agentInfo = data.agent ? ` [${data.agent}]` : "";
-          return `${data.response}${agentInfo}`;
+          return textResult(`${data.response}${agentInfo}`, { agent: data.agent });
         }
 
-        return "BestBox returned an empty response.";
+        return textResult("BestBox returned an empty response.");
       } catch (err) {
         if (err instanceof Error && err.name === "AbortError") {
-          return `BestBox request timed out after ${timeout}ms. Check if the Agent API is running at ${apiUrl}`;
+          return textResult(
+            `BestBox request timed out after ${timeout}ms. Check if the Agent API is running at ${apiUrl}`
+          );
         }
-        return `BestBox connection error: ${err instanceof Error ? err.message : String(err)}`;
+        return textResult(
+          `BestBox connection error: ${err instanceof Error ? err.message : String(err)}`
+        );
       }
     },
   };
