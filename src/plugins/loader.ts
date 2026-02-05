@@ -207,15 +207,24 @@ export function loadOpenClawPlugins(options: PluginLoadOptions = {}): PluginRegi
   });
   pushDiagnostics(registry.diagnostics, manifestRegistry.diagnostics);
 
+  const resolveZodAlias = (): string | null => {
+    try {
+      const jiti = createJiti(import.meta.url);
+      return jiti.resolve("zod");
+    } catch {
+      return null;
+    }
+  };
+
   const pluginSdkAlias = resolvePluginSdkAlias();
+  const zodAlias = resolveZodAlias();
   const jiti = createJiti(import.meta.url, {
     interopDefault: true,
     extensions: [".ts", ".tsx", ".mts", ".cts", ".mtsx", ".ctsx", ".js", ".mjs", ".cjs", ".json"],
-    ...(pluginSdkAlias
-      ? {
-          alias: { "openclaw/plugin-sdk": pluginSdkAlias },
-        }
-      : {}),
+    alias: {
+      ...(pluginSdkAlias ? { "openclaw/plugin-sdk": pluginSdkAlias } : {}),
+      ...(zodAlias ? { zod: zodAlias } : {}),
+    },
   });
 
   const manifestByRoot = new Map(
